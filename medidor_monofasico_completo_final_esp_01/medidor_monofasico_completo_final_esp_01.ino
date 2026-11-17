@@ -28,10 +28,10 @@ const unsigned long TEMPO_ESTABILIZACAO = 8000;
 // ========== CONFIGURAÇÃO DISPLAY U8G2 (SH1106 1.3") ==========
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
-// ========== CALIBRACAO (escala 12 bits + LPF: calibrado vs medidor-calibrador) ==========
-#define V_CAL 1019.5
+// ========== CALIBRACAO (escala 12 bits + LPF: calibrado para fonte externa 5V) ==========
+#define V_CAL 1000.0
 #define I_CAL 4.67
-#define PHASECAL -3.3
+#define PHASECAL -3.9
 
 EnergyMonitorESP32 emon1;
 Preferences preferences;

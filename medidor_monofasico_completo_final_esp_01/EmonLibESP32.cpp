@@ -73,6 +73,8 @@ void EnergyMonitorESP32::calcVI(unsigned int crossings, unsigned int timeout) {
   double sumFiltI = 0.0, sumFiltI2 = 0.0;
   double sumPSV = 0.0, sumP = 0.0;
   double filtV = 0.0, filtI = 0.0, lastFiltV = 0.0;
+  double vRing[32] = {0.0};
+  unsigned int ringIdx = 0;
   double minFV = 4095.0, maxFV = -4095.0;
   double minFI = 4095.0, maxFI = -4095.0;
   bool checkVCross = false;
@@ -94,10 +96,13 @@ void EnergyMonitorESP32::calcVI(unsigned int crossings, unsigned int timeout) {
       filtV = rawDV;
       filtI = rawDI;
       lastFiltV = filtV;
+      for (int k = 0; k < 32; k++) vRing[k] = filtV;
     } else {
       lastFiltV = filtV;
       filtV = filtV + LPF_ALPHA * (rawDV - filtV);
       filtI = filtI + LPF_ALPHA * (rawDI - filtI);
+      ringIdx = (ringIdx + 1) & 31;
+      vRing[ringIdx] = filtV;
     }
 
     if (filtV < minFV) minFV = filtV;
@@ -110,7 +115,19 @@ void EnergyMonitorESP32::calcVI(unsigned int crossings, unsigned int timeout) {
     sumFiltI += filtI;
     sumFiltI2 += filtI * filtI;
 
-    double phaseShiftedV = lastFiltV + PHASECAL * (filtV - lastFiltV);
+    // Atraso fracionario exato via buffer circular quando PHASECAL <= 1.0 (ganho unitario sem amplificar ruido)
+    double phaseShiftedV;
+    if (PHASECAL <= 1.0) {
+      double delaySamples = 1.0 - PHASECAL;
+      if (delaySamples > 30.0) delaySamples = 30.0;
+      unsigned int d0 = (unsigned int)delaySamples;
+      double frac = delaySamples - (double)d0;
+      double v0 = vRing[(ringIdx - d0) & 31];
+      double v1 = vRing[(ringIdx - d0 - 1) & 31];
+      phaseShiftedV = v0 + frac * (v1 - v0);
+    } else {
+      phaseShiftedV = lastFiltV + PHASECAL * (filtV - lastFiltV);
+    }
     sumPSV += phaseShiftedV;
     sumP += phaseShiftedV * filtI;
 

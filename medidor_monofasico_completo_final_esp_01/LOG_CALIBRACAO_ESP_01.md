@@ -151,3 +151,43 @@
 * Para levar `FP` de `0.674` exatamente para `0.680` (e `Q` de `~192 VAr` para `190 VAr`), basta ajustar `PHASECAL` de `-3.3` para **`-3.5`**.
 * Validar também o comportamento com a tomada AC **desligada** para confirmar `V = 0.00 V` (`noAC = 1`).
 
+---
+
+## 8. Alteração #4 — Recalibração do `esp_01` para Fonte Externa de 5 V
+
+* **Leitura obtida na fonte externa de 5 V vs. medidor-calibrador:**
+  * ESP 01: `231 V`, `1,25 A`, `194 W`, `289 VA`, `214 VAr`, `0,67 fp`
+  * Calibrador: `208 V`, `1,26 A`, `179 W`, `263 VA`, `192 VAr`, `0,68 fp`
+* **Atualização em `EmonLibESP32.cpp` (`esp_01`):** sincronizado o atraso fracionário em buffer circular (`vRing[32]`) desenvolvido no `esp_03` (ganho unitário exato).
+* **Recalibração em `medidor_monofasico_completo_final_esp_01.ino`:**
+  * `V_CAL = 918.0` ($1019{,}5 \times \frac{208}{231}$)
+  * `I_CAL = 4.71` ($4{,}67 \times \frac{1{,}26}{1{,}25}$)
+  * `PHASECAL = -3.9` (atraso equivalente em buffer circular para fechar `0,68 fp`)
+
+---
+
+## 9. Alteração #5 — Ajuste Fino na Fonte Externa 5 V (`192 V` $\rightarrow$ `211 V`, `1,28 A` $\rightarrow$ `1,27 A`)
+
+* `V_CAL = 1009.0` ($918{,}0 \times \frac{211}{192}$)
+* `I_CAL = 4.67` ($4{,}71 \times \frac{1{,}27}{1{,}28}$)
+* `PHASECAL = -3.9` (mantido)
+  * Resultado em bancada: `I = 1,25 A` (exato), `FP = 0,69` (exato), `V = 214 V` vs. `209 V`.
+
+---
+
+## 10. Alteração #6 — Ajuste Fino Final de `V_CAL` (`214 V` $\rightarrow$ `209 V`)
+
+* `V_CAL = 985.5` ($1009{,}0 \times \frac{209}{214}$)
+* `I_CAL = 4.67` (mantido)
+* `PHASECAL = -3.9` (mantido)
+  * Resultado em bancada: `207 V` vs. `210 V`.
+
+---
+
+## 11. Alteração #7 — Ajuste Fino Final de `V_CAL` (`207 V` $\rightarrow$ `210 V`)
+
+* `V_CAL = 1000.0` ($985{,}5 \times \frac{210}{207}$)
+* `I_CAL = 4.67` (mantido)
+* `PHASECAL = -3.9` (mantido)
+* **Validação final na fonte externa de 5 V:** `208 V`, `1,25 A`, `FP = 0,68` — idêntico ao medidor-calibrador (`esp_01` finalizado e integrado à `main`).
+
