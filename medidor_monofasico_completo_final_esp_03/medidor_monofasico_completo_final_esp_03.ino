@@ -1,9 +1,10 @@
-#include "EmonLib.h"
+#include "EmonLibESP32.h"
 #include <Preferences.h>
 #include <Wire.h>
 #include <U8g2lib.h>     
 #include <WiFi.h>
 #include <WebServer.h>
+#include <math.h>
 
 // ========== CONFIGURAÇÃO WIFI (ACCESS POINT) ==========
 const char* ssid = "LAB_MED_ELET_03";
@@ -27,19 +28,20 @@ const unsigned long TEMPO_ESTABILIZACAO = 8000;
 // ========== CONFIGURAÇÃO DISPLAY U8G2 (SH1106 1.3") ==========
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
-// ========== CALIBRACAO ==========
-#define V_CAL 244
-#define I_CAL 1.32
-#define PHASECAL -3.5
+// ========== CALIBRACAO (escala 12 bits + LPF: calibrado para fonte 5V vs calibrador 0.71fp) ==========
+#define V_CAL 2138.0
+#define I_CAL 4.76
+#define PHASECAL -9.9
 
-EnergyMonitor emon1;
+EnergyMonitorESP32 emon1;
 Preferences preferences;
 
 // Variáveis Globais de Medição
-float v, i, p, s, q, fp;
+float v = 0.0, i = 0.0, p = 0.0, s = 0.0, q = 0.0, fp = 0.0;
 int telaAtual = 0;
 int telaAnterior = 0;
 double consumoKWh = 0.0;
+double ultimoConsumoSalvo = 0.0;
 unsigned long tempoAnterior = 0;
 unsigned long ultimoSalvamento = 0;
 unsigned long ultimaMedicao = 0;
@@ -139,6 +141,8 @@ void setup() {
   
   preferences.begin("medidor", false); 
   consumoKWh = preferences.getDouble("consumo", 0.0);
+  if (!isfinite(consumoKWh) || consumoKWh < 0.0) consumoKWh = 0.0;
+  ultimoConsumoSalvo = consumoKWh;
 
   WiFi.softAP(ssid, password, wifi_channel);
   IPAddress IP = WiFi.softAPIP();
@@ -179,40 +183,56 @@ void loop() {
     
     server.handleClient();
     
-    emon1.calcVI(100, 2000);  
-    
+    unsigned long tInicioCalc = millis();
+    emon1.calcVI(100, 1100);
+    unsigned long dtCalcMs = millis() - tInicioCalc;
+
+    int adcV = analogRead(ZMPT_PIN);
+    int adcI = analogRead(SCT_PIN);
+    bool emEstabilizacao = (millis() < TEMPO_ESTABILIZACAO);
+
     // ==============================================================
     // TRAVA DE SEGURANÇA CONTRA RUÍDOS DE BOOT
     // ==============================================================
-    if (millis() < TEMPO_ESTABILIZACAO) {
+    if (emEstabilizacao) {
       // Nos primeiros 8 segundos, ignora os cálculos da EmonLib
       // Isso protege o banco de dados contra picos falsos de capacitor carregando
       v = 0.0;
       i = 0.0;
-      p = 0.0;     
-      s = 0.0; 
+      p = 0.0;
+      s = 0.0;
       fp = 0.0;
       q = 0.0;
     } else {
-      // Passou o período de estabilização, assume os valores reais
-      v = emon1.Vrms;
-      i = emon1.Irms;
-      p = emon1.realPower;     
-      s = emon1.apparentPower; 
-      fp = emon1.powerFactor;   
-      
-      // Filtro de ruído mínimo de linha (abaixo disso é considerado zero)
-      if (v < 80.0 || i < 0.05) { 
-        v=0; i=0; p=0; s=0; fp=0; 
+      // Passou o período de estabilização, assume os valores reais com proteção contra NaN
+      v = isfinite(emon1.Vrms) ? (float)emon1.Vrms : 0.0f;
+      i = isfinite(emon1.Irms) ? (float)emon1.Irms : 0.0f;
+      p = isfinite(emon1.realPower) ? (float)emon1.realPower : 0.0f;
+      s = isfinite(emon1.apparentPower) ? (float)emon1.apparentPower : 0.0f;
+      fp = isfinite(emon1.powerFactor) ? (float)emon1.powerFactor : 0.0f;
+
+      // Filtro de ruído mínimo: mantém V visível a vazio; zera V somente se < 80V ou sem AC
+      if (emon1.noAcSignal || v < 80.0f) {
+        v = 0.0f; i = 0.0f; p = 0.0f; s = 0.0f; fp = 0.0f; q = 0.0f;
+      } else if (i < 0.05f) {
+        i = 0.0f; p = 0.0f; s = 0.0f; fp = 0.0f; q = 0.0f;
+      } else {
+        float diffSq = (s * s) - (p * p);
+        q = (diffSq > 0.0f) ? sqrtf(diffSq) : 0.0f;
       }
-      
-      q = (s > p) ? sqrt(pow(s, 2) - pow(p, 2)) : 0.0;
     }
     // ==============================================================
 
+    Serial.printf("[%s] V=%.2fV | I=%.3fA | P=%.1fW | S=%.1fVA | Q=%.1fVAr | FP=%.3f | E=%.5fkWh | calc=%lums (N=%u,X=%u,noAC=%d) | ppV=%d ppI=%d offV=%.0f offI=%.0f | ADC_V=%d ADC_I=%d\n",
+                  emEstabilizacao ? "ESTAB" : "MED",
+                  v, i, p, s, q, fp, consumoKWh,
+                  dtCalcMs, emon1.lastSamples, emon1.lastCrossings, emon1.noAcSignal ? 1 : 0,
+                  emon1.lastPpV, emon1.lastPpI, emon1.lastOffsetV, emon1.lastOffsetI,
+                  adcV, adcI);
+
     double intervaloHoras = (double)(tempoAtual - tempoAnterior) / 3600000.0;
     if (p > 1.0) {
-      double energiaWh = (p / 1000.0) * intervaloHoras * 1000.0;
+      double energiaWh = p * intervaloHoras;
       consumoKWh += energiaWh / 1000.0;
       energiaAcumuladaParaPulso += energiaWh;
       double whPorPulso = 1000.0 / PULSOS_POR_KWH;
@@ -228,7 +248,10 @@ void loop() {
   }
 
   if (tempoAtual - ultimoSalvamento > 10000) {
-    preferences.putDouble("consumo", consumoKWh);
+    if (fabs(consumoKWh - ultimoConsumoSalvo) > 1e-6) {
+      preferences.putDouble("consumo", consumoKWh);
+      ultimoConsumoSalvo = consumoKWh;
+    }
     ultimoSalvamento = tempoAtual;
   }
   
@@ -266,17 +289,20 @@ void processarBotao() {
       }
       if (duracao >= 10000) {
         consumoKWh = 0.0;
+        ultimoConsumoSalvo = 0.0;
         preferences.putDouble("consumo", 0.0);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_ncenB14_tr);
         u8g2.drawStr(20, 40, "ZERADO!");
         u8g2.sendBuffer();
         delay(1500);
+        botaoFlag = false;
         return;
       }
     }
     delay(5);
   }
+  botaoFlag = false;
   atualizarDisplay(v, i, p, s, q, fp);
 }
 
