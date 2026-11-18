@@ -28,3 +28,16 @@
   - `PHASECAL`: `-4.9` -> `-4.9`
 
 **Status:** Pronto para ajuste do trimpot (se necessário) e calibração em bancada (`V_CAL`, `I_CAL`, `PHASECAL`).
+
+---
+
+## Alteração #2 — Calibração final em bancada aprovada
+
+**Data:** 2026-11-18  
+**Trimpot ZMPT101B:** Ajustado no ponto médio (`~1300`, faixa `400–2200`).  
+**Parâmetros finais (fonte externa 5 V vs calibrador):**
+- `V_CAL = 537.2`
+- `I_CAL = 4.79`
+- `PHASECAL = -5.3`
+
+**Resultado:** Leituras aprovadas em bancada.
