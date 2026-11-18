@@ -29,9 +29,9 @@ const unsigned long TEMPO_ESTABILIZACAO = 8000;
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 // ========== CALIBRACAO (escala 12 bits + LPF: pre-ajustado 4x do original, pendente calibracao em bancada) ==========
-#define V_CAL 944.0
-#define I_CAL 4.44
-#define PHASECAL -5.4
+#define V_CAL 489.0
+#define I_CAL 4.67
+#define PHASECAL -5.1
 
 EnergyMonitorESP32 emon1;
 Preferences preferences;
