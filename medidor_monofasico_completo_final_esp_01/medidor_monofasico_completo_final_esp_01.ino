@@ -29,7 +29,7 @@ const unsigned long TEMPO_ESTABILIZACAO = 8000;
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 // ========== CALIBRACAO (escala 12 bits + LPF: calibrado apos ajuste medio do trimpot) ==========
-#define V_CAL 1612.5
+#define V_CAL 1618.5
 #define I_CAL 4.67
 #define PHASECAL -5.9
 
