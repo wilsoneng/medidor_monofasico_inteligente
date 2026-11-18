@@ -191,3 +191,20 @@
 * `PHASECAL = -3.9` (mantido)
 * **Validação final na fonte externa de 5 V:** `208 V`, `1,25 A`, `FP = 0,68` — idêntico ao medidor-calibrador (`esp_01` finalizado e integrado à `main`).
 
+---
+
+## 12. Alteração #8 — Ajuste de Trimpot no Ponto Médio + Novo `V_CAL`
+
+* **Ferramenta auxiliar criada:** `ajuste_trimpot_tp/ajuste_trimpot_tp.ino` (varredura de mínimo/máximo do trimpot do ZMPT101B: `400` a `1700`, ajustado no ponto médio `~1050`).
+* **Leitura após ajuste do trimpot (com `V_CAL = 987.0`):** `133 V` no ESP 01 vs. `212 V` no calibrador.
+* **Novo `V_CAL`:** **`1573.0`** ($987{,}0 \times \frac{212}{133}$).
+* **Mantidos:** `I_CAL = 4.67`, `PHASECAL = -3.9`.
+
+
+---
+
+## Alteração #9 — Calibração final de `V_CAL` e `PHASECAL` aprovada em bancada
+
+**Data:** 2026-11-18  
+**Referência (bancada / fonte externa 5 V):** `V_CAL = 1612.5`, `I_CAL = 4.67`, `PHASECAL = -5.9`.  
+**Resultado:** Leituras de tensão, corrente, potências e fator de potência aprovadas em bancada.
